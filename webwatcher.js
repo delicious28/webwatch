@@ -12,7 +12,7 @@
 
         var pageStartTime = new Date().getTime();
 
-        win.$WebWatcher = {
+        var $WebWatcher = {
             opt: {
                 isWatching: true, //是否实时监控(如果新加的图片加载失败，也能监控到，会调用setInterval，有一定的消耗)
                 isWatchImg: true,
@@ -22,11 +22,13 @@
                 isSubmiting: false, //是否正在提交
                 intervalSubmitTime: 3000, //默认每3S检测一下是否有没有提交的数据
                 intervalCheckTime: 20, //循环检测时间，毫秒
-                submitUrl: "xxxx.ashx"
+				isSubmited:false,
+                submitUrl: "http://10.1.56.60:2012/flight/flightselftripajax.aspx?type=PAGEMONITOR"
             },
 
             userInfo: {},
             logList: [],
+			imgList:[],
 
             //初始化
             init: function () {
@@ -41,7 +43,8 @@
                     userAgent: navigator.userAgent, //包含浏览器，操作系统，版本等信息
                     domOnLoadTime: 0, //domOnLoad花费的时间，毫秒
                     pageOnloadTime: 0, //pageonload花费的时间，毫秒
-                    reffer:document.reffer || ''
+                    reffer:document.reffer || '', //referrer
+					currentUrl:location.href	//当前url
                     //还需要什么信息后期添加
                 }
 
@@ -85,10 +88,16 @@
                     }
 
                     if (this.opt.isWatching) {
-                        //开启实时监控
+                        
+						//开启实时监控
                         setInterval(function () {
                             self.watchImg();
                         }, this.opt.intervalCheckTime);
+						
+						//循环submit
+						setInterval(function () {
+                            self.submit();
+                        }, this.opt.intervalSubmitTime);
                     }
                 }
             },
@@ -98,7 +107,7 @@
 
                 win.onerror = function (msg, url, line) {
 
-                    win.$WebWatcher.add({
+                    $WebWatcher.add({
                         type: "js",
                         cnt: msg,
                         requestUrl: url,
@@ -110,29 +119,38 @@
 
             //监控图片加载
             watchImg: function () {
-
+				
+				
                 fish.all("img").on("error", function (e) {
-                    win.$WebWatcher.add({
-                        type: "img",
-                        isSuccess:false,
-                        requestUrl: e.target.src
-                    });
+					
+					if($WebWatcher.imgList.indexOf(e.target.src)==-1)
+					{
+						 $WebWatcher.add({
+							type: "img",
+							isSuccess:false,
+							requestUrl: e.target.src
+						});
+						$WebWatcher.imgList.push(e.target.src);
+					}
                 });
             },
 
             //ajax监控
             watchAjax: function () {
-	
                 function ajaxLog(ajax) {
-                    win.$WebWatcher.add({
+					
+					var item={
                         type: "ajax",
                         isSuccess: ajax.isSuccess,
                         costTime: ajax.costTime || 0,
                         cnt: ajax.cnt || '',
                         requestUrl: ajax.requestUrl || '',
                         requestType: ajax.requestType || 'get',
-                        responseCode:0
-                    });
+                        responseCode:ajax.responseCode,
+						pageUrl:location.href
+                    };
+					
+                    $WebWatcher.add(item);
                 };
 
                 win.fish.ajax = function (param) {
@@ -161,7 +179,7 @@
                                 clearTimeout(param.timer);
                                 var data = xmlhttp.responseText;
 
-                                alert(xmlhttp.status);
+                                //alert(xmlhttp.status);
 
                                 ajaxLog({
                                     isSuccess: true,
@@ -361,53 +379,97 @@
             add: function (error) {
 
                 this.logList.push(error);
-                //debugger;
-                this.logList = this.errorUnique(this.logList);
 
-                console.log(JSON.stringify(error));
             },
 
             //提交监控数据
             submit: function () {
 
                 if (this.logList.length > 0 && !this.opt.isSubmiting) {
+					
+					this.userInfo.isFirstSubmit=!this.opt.isSubmited;
+					
                     //提交数据
                     var logInfo = {
-                        userInfo: this.userInfo,
-                        logList: this.logList
-                    };
+                        logList: this.unique(this.logList),
+						userInfo:this.userInfo
+                    };				
+					
+					this.post({"data":JSON.stringify(logInfo)});
+					
+					this.opt.isSubmited=true;
+					
+					this.logList=[];
+					
                     console.log(JSON.stringify(logInfo));
                 }
             },
+			
+			
+			//跨域post提交
+			post:function(prams) {
+				var iframe = document.createElement("iframe");	
+					iframe.id="submitFrame";
+					iframe.name="submitFrame";
+					iframe.src="about:blank";
+					iframe.style.width=0;
+					iframe.style.height=0;
+					
+				document.body.appendChild(iframe);
+			
+				var form = document.createElement("form"); 
+					form.action = this.opt.submitUrl;
+					form.target="submitFrame";
+					form.method = "post"; 
+					form.style.display = "none"; 
+					
+					for (var x in prams) { 
+						var opt = document.createElement("textarea"); 
+						opt.name = x; 
+						opt.value = prams[x]; 
+						form.appendChild(opt); 
+					}
+				document.body.appendChild(form); 
+				form.submit(); 
+				
+				//2秒后销毁
+				setTimeout(function(){					
+					iframe.parentNode.removeChild(iframe);
+					form.parentNode.removeChild(form);
+				},2000);
+			},
+			
+			//合并错误信息
+			unique:function(list) {
+				try {
+					list.sort();
+					var re = [list[0]];
+					for (var i = 1; i < list.length; i++) {
 
-            //合并错误信息
-            errorUnique: function (list) {
-                try {
-                    list.sort();
-                    var re = [list[0]];
-                    for (var i = 1; i < list.length; i++) {
+						var item = list[i];
 
-                        var item = list[i];
-
-                        for (var p in item) {
-                            if (!re[re.length - 1][p] || re[re.length - 1][p] !== item[p]) {
-                                re.push(list[i]);
-                            }
-                        }
-                    }
-                    return re;
-                }
-                catch (e) {
-                    console.log(e);
-                }
-            }
-        };
+						if(re.indexOf(item)==-1)
+						{
+							re.push(item);
+						}
+					}
+					return re;
+				}
+				catch (e) {
+					console.log(e);
+				}
+			}
+        }
     }
 
     try {
         //默认启动
-        win.$WebWatcher.start();
+        $WebWatcher.start();
+		
+		win.$WebWatcher=$WebWatcher;
     }
-    catch (e) { }
+    catch (e) {
+		//alert(e);
+	}
 
 })(window);
