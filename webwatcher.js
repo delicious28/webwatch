@@ -23,7 +23,7 @@
                 intervalSubmitTime: 3000, //默认每3S检测一下是否有没有提交的数据
                 intervalCheckTime: 20, //循环检测时间，毫秒
 				isSubmited:false,
-                submitUrl: "http://10.1.56.60:2012/flight/flightselftripajax.aspx?type=PAGEMONITOR"
+                submitUrl: "/flight/flightselftripajax.aspx?type=PAGEMONITOR"
             },
 
             userInfo: {},
@@ -138,19 +138,22 @@
             //ajax监控
             watchAjax: function () {
                 function ajaxLog(ajax) {
-					
-					var item={
-                        type: "ajax",
-                        isSuccess: ajax.isSuccess,
-                        costTime: ajax.costTime || 0,
-                        cnt: ajax.cnt || '',
-                        requestUrl: ajax.requestUrl || '',
-                        requestType: ajax.requestType || 'get',
-                        responseCode:ajax.responseCode,
-						pageUrl:location.href
-                    };
-					
-                    $WebWatcher.add(item);
+					try{
+                        $WebWatcher.add({
+                            type: "ajax",
+                            isSuccess: ajax.isSuccess,
+                            costTime: ajax.costTime || 0,
+                            cnt: ajax.cnt || '',
+                            requestUrl: ajax.requestUrl || '',
+                            requestType: ajax.requestType || 'get',
+                            responseCode:ajax.responseCode,
+                            pageUrl:location.href
+                        });
+                    }
+                    catch(e)
+                    {
+
+                    }
                 };
 
                 win.fish.ajax = function (param) {
@@ -191,7 +194,7 @@
                                 });
 
                                 if (type === "json") {
-                                    data = new Function("return " + data)();
+                                    data = function(){return data};
                                 }
                                 fn && fn(data);
                                 param.cache && (ajaxCaches[urlSend] = data);
@@ -401,7 +404,7 @@
 					
 					this.logList=[];
 					
-                    console.log(JSON.stringify(logInfo));
+                    //console.log(JSON.stringify(logInfo));
                 }
             },
 			
@@ -456,7 +459,7 @@
 					return re;
 				}
 				catch (e) {
-					console.log(e);
+					//console.log(e);
 				}
 			}
         }
