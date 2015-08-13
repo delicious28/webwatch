@@ -123,14 +123,27 @@
 				
                 fish.all("img").on("error", function (e) {
 					
-					if($WebWatcher.imgList.indexOf(e.target.src)==-1)
+
+
+                    var src="";
+
+                    if(e.target && e.target.src)
+                    {
+                        src=e.target.src;
+                    }
+                    else if(e.srcElement)
+                    {
+                        src=e.srcElement.src;
+                    }
+
+					if($WebWatcher.imgList.indexOf(src)==-1)
 					{
 						 $WebWatcher.add({
 							type: "img",
 							isSuccess:false,
-							requestUrl: e.target.src
+							requestUrl: src
 						});
-						$WebWatcher.imgList.push(e.target.src);
+						$WebWatcher.imgList.push(src);
 					}
                 });
             },
@@ -171,6 +184,10 @@
                             ajaxStartTime = new Date().getTime(),
                             costTime=0,
                             finalUrl;
+
+
+
+
                         if (!urlSend) {
                             return;
                         }
@@ -276,13 +293,15 @@
 
                                     costTime = (new Date().getTime() - ajaxStartTime);
 
+
+                                   
                                     ajaxLog({
                                         isSuccess: true,
                                         costTime: costTime,
                                         cnt: "ajax Success, spend " + costTime + " millisecond",
                                         requestUrl: param.url,
                                         requestType: "jsonp",
-                                        responseCode: xmlhttp.status
+                                        responseCode: 0
                                     });
 
                                     if (param.cache && ajaxCaches[urlSend] === undefined) {
@@ -396,9 +415,13 @@
                     var logInfo = {
                         logList: this.unique(this.logList),
 						userInfo:this.userInfo
-                    };				
-					
-					this.post({"data":JSON.stringify(logInfo)});
+                    };
+
+                   try{
+                        this.post({"data":JSON.stringify(logInfo)});
+                   }
+                   catch(){};
+                    
 					
 					this.opt.isSubmited=true;
 					
